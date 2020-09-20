@@ -16,8 +16,14 @@ object Main extends App {
       AsyncHttpClientZioBackend.layer(SttpBackendOptions(10.seconds, None))
 
     val program = for {
-      result <- ExpointsClient.allCustomers()
-      _ <- putStrLn(result.toString)
+      nextCursorRef <- Ref.make[Option[String]](None)
+
+      _ <- (for {
+          nextPage <- nextCursorRef.get
+          result <- ExpointsClient.allCustomers(nextPage).tap { response =>
+            nextCursorRef.update(_ => Option.unless(response.NextCursor.isEmpty)(response.NextCursor))
+          }
+        } yield result).repeatWhile(!_.NextCursor.isEmpty)
     } yield ()
 
     program

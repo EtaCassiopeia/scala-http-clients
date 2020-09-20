@@ -18,8 +18,9 @@ object ExpointsClient {
   private val scheduler = Schedule.exponential(50.millis) && Schedule.recurs(10)
 
   //https://documentation.expoints.nl/external/Help/Api/GET-api-v3-customer
-  def allCustomers(): ZIO[ClientEnv, Error, CustomerResponse] = {
+  def allCustomers(nextCursor: Option[String]): ZIO[ClientEnv, Error, CustomerResponse] = {
 
+    //TODO apply NextCursor
     val request = basicRequest
       .response(asJson[CustomerResponse])
       .get(baseUrl.path("/external/api/v3/customer"))
