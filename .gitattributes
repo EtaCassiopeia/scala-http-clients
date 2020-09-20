@@ -1,0 +1,8 @@
+# These files are text and should be normalized (convert crlf =&gt; lf)
+.gitattributes  text
+*.md            text
+*.scala         text
+*.sbt           text
+*.properties    text
+*.conf          text
+*.csv           text
