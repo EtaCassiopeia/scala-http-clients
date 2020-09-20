@@ -1,7 +1,12 @@
 package co.datachef.http.client.sttp
 
 import co.datachef.http.client.domain.CustomerResponse
-import co.datachef.http.client.sttp.Error.{ErrorFetchingCustomers, ExpointsError, RequestTimedOut}
+import co.datachef.http.client.sttp.Error.{
+  ErrorFetchingCustomers,
+  GenericExpointsError,
+  RequestTimedOut,
+  TooManyRequests
+}
 import io.circe.generic.auto._
 import sttp.client.asynchttpclient.zio.SttpClient
 import sttp.client.basicRequest
@@ -15,7 +20,11 @@ object ExpointsClient {
   type ClientEnv = SttpClient with Clock
 
   private val baseUrl = Uri("https", "[customer].expoints.nl")
-  private val scheduler = Schedule.exponential(50.millis) && Schedule.recurs(10)
+  private val scheduler = Schedule.exponential(50.millis) && (Schedule.recurs(5)
+    && Schedule.recurWhile[Error] {
+      case TooManyRequests(_) => false
+      case _                  => true
+    })
 
   //https://documentation.expoints.nl/external/Help/Api/GET-api-v3-customer
   def allCustomers(nextCursor: Option[String]): ZIO[ClientEnv, Error, CustomerResponse] = {
@@ -27,13 +36,14 @@ object ExpointsClient {
 
     SttpClient
       .send(request)
-      .retry(scheduler)
       .timeoutFail(RequestTimedOut(s"Request to get list of customers"))(30.seconds)
       .reject {
-        case r if r.code == StatusCode.TooManyRequests => ExpointsError(r.toString())
+        case r if r.code == StatusCode.TooManyRequests => TooManyRequests(r.toString())
       }
       .map(_.body)
       .absolve
       .bimap(err => ErrorFetchingCustomers(err.getMessage), identity)
+      .retry(scheduler)
+
   }
 }
